@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-provider-azurerm/helpers/tf"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/clients"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/suppress"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/validation"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/timeouts"
 )
@@ -139,8 +140,12 @@ func resourceNetworkSecurityRule() *pluginsdk.Resource {
 				MaxItems:     10,
 				Optional:     true,
 				ExactlyOneOf: []string{"source_address_prefix", "source_address_prefixes", "source_application_security_group_ids"},
-				Elem:         &pluginsdk.Schema{Type: pluginsdk.TypeString},
-				Set:          pluginsdk.HashString,
+				Elem: &pluginsdk.Schema{
+					Type:                  pluginsdk.TypeString,
+					DiffSuppressFunc:      suppress.CaseDifference,
+					DiffSuppressOnRefresh: true,
+				},
+				Set: HashCaseInsensitiveString,
 			},
 
 			// lintignore:S018
@@ -149,8 +154,12 @@ func resourceNetworkSecurityRule() *pluginsdk.Resource {
 				MaxItems:     10,
 				Optional:     true,
 				ExactlyOneOf: []string{"destination_address_prefix", "destination_address_prefixes", "destination_application_security_group_ids"},
-				Elem:         &pluginsdk.Schema{Type: pluginsdk.TypeString},
-				Set:          pluginsdk.HashString,
+				Elem: &pluginsdk.Schema{
+					Type:                  pluginsdk.TypeString,
+					DiffSuppressFunc:      suppress.CaseDifference,
+					DiffSuppressOnRefresh: true,
+				},
+				Set: HashCaseInsensitiveString,
 			},
 
 			"access": {
@@ -262,7 +271,7 @@ func resourceNetworkSecurityRuleCreate(d *pluginsdk.ResourceData, meta interface
 		var sourceApplicationSecurityGroups []securityrules.ApplicationSecurityGroup
 		for _, v := range r.(*pluginsdk.Set).List() {
 			sg := securityrules.ApplicationSecurityGroup{
-				Id: pointer.To(v.(string)),
+				Id: pointer.To(strings.ToLower(v.(string))),
 			}
 			sourceApplicationSecurityGroups = append(sourceApplicationSecurityGroups, sg)
 		}
@@ -273,7 +282,7 @@ func resourceNetworkSecurityRuleCreate(d *pluginsdk.ResourceData, meta interface
 		var destinationApplicationSecurityGroups []securityrules.ApplicationSecurityGroup
 		for _, v := range r.(*pluginsdk.Set).List() {
 			sg := securityrules.ApplicationSecurityGroup{
-				Id: pointer.To(v.(string)),
+				Id: pointer.To(strings.ToLower(v.(string))),
 			}
 			destinationApplicationSecurityGroups = append(destinationApplicationSecurityGroups, sg)
 		}
@@ -381,7 +390,7 @@ func resourceNetworkSecurityRuleUpdate(d *pluginsdk.ResourceData, meta interface
 		var sourceApplicationSecurityGroups []securityrules.ApplicationSecurityGroup
 		for _, v := range d.Get("source_application_security_group_ids").(*pluginsdk.Set).List() {
 			sg := securityrules.ApplicationSecurityGroup{
-				Id: pointer.To(v.(string)),
+				Id: pointer.To(strings.ToLower(v.(string))),
 			}
 			sourceApplicationSecurityGroups = append(sourceApplicationSecurityGroups, sg)
 		}
@@ -392,7 +401,7 @@ func resourceNetworkSecurityRuleUpdate(d *pluginsdk.ResourceData, meta interface
 		var destinationApplicationSecurityGroups []securityrules.ApplicationSecurityGroup
 		for _, v := range d.Get("destination_application_security_group_ids").(*pluginsdk.Set).List() {
 			sg := securityrules.ApplicationSecurityGroup{
-				Id: pointer.To(v.(string)),
+				Id: pointer.To(strings.ToLower(v.(string))),
 			}
 			destinationApplicationSecurityGroups = append(destinationApplicationSecurityGroups, sg)
 		}
@@ -506,4 +515,9 @@ func flattenApplicationSecurityGroupIds(groups *[]securityrules.ApplicationSecur
 	}
 
 	return ids
+}
+
+// HashCaseInsensitiveString provides case-insensitive hashing for TypeSet elements
+func HashCaseInsensitiveString(v interface{}) int {
+	return pluginsdk.HashString(strings.ToLower(v.(string)))
 }

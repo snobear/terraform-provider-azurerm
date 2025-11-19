@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-provider-azurerm/internal/locks"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/pluginsdk"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/set"
+	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/suppress"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/tf/validation"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/timeouts"
 )
@@ -142,15 +143,23 @@ func resourceNetworkSecurityGroup() *pluginsdk.Resource {
 						"destination_application_security_group_ids": {
 							Type:     pluginsdk.TypeSet,
 							Optional: true,
-							Elem:     &pluginsdk.Schema{Type: pluginsdk.TypeString},
-							Set:      pluginsdk.HashString,
+							Elem: &pluginsdk.Schema{
+							Type:                  pluginsdk.TypeString,
+							DiffSuppressFunc:      suppress.CaseDifference,
+							DiffSuppressOnRefresh: true,
+							},
+							Set: HashCaseInsensitiveStringNSG,
 						},
 
 						"source_application_security_group_ids": {
 							Type:     pluginsdk.TypeSet,
 							Optional: true,
-							Elem:     &pluginsdk.Schema{Type: pluginsdk.TypeString},
-							Set:      pluginsdk.HashString,
+							Elem: &pluginsdk.Schema{
+							Type:                  pluginsdk.TypeString,
+							DiffSuppressFunc:      suppress.CaseDifference,
+							DiffSuppressOnRefresh: true,
+							},
+							Set: HashCaseInsensitiveStringNSG,
 						},
 
 						"access": {
@@ -402,7 +411,7 @@ func expandSecurityRules(d *pluginsdk.ResourceData) ([]networksecuritygroups.Sec
 			var sourceApplicationSecurityGroups []networksecuritygroups.ApplicationSecurityGroup
 			for _, v := range r.List() {
 				sg := networksecuritygroups.ApplicationSecurityGroup{
-					Id: pointer.To(v.(string)),
+					Id: pointer.To(strings.ToLower(v.(string))),
 				}
 				sourceApplicationSecurityGroups = append(sourceApplicationSecurityGroups, sg)
 			}
@@ -413,7 +422,7 @@ func expandSecurityRules(d *pluginsdk.ResourceData) ([]networksecuritygroups.Sec
 			var destinationApplicationSecurityGroups []networksecuritygroups.ApplicationSecurityGroup
 			for _, v := range r.List() {
 				sg := networksecuritygroups.ApplicationSecurityGroup{
-					Id: pointer.To(v.(string)),
+					Id: pointer.To(strings.ToLower(v.(string))),
 				}
 				destinationApplicationSecurityGroups = append(destinationApplicationSecurityGroups, sg)
 			}
@@ -465,7 +474,7 @@ func flattenNetworkSecurityRules(rules *[]networksecuritygroups.SecurityRule) []
 				destinationApplicationSecurityGroups := make([]string, 0)
 				if props.DestinationApplicationSecurityGroups != nil {
 					for _, g := range *props.DestinationApplicationSecurityGroups {
-						destinationApplicationSecurityGroups = append(destinationApplicationSecurityGroups, *g.Id)
+						destinationApplicationSecurityGroups = append(destinationApplicationSecurityGroups, strings.ToLower(*g.Id))
 					}
 				}
 				sgRule["destination_application_security_group_ids"] = set.FromStringSlice(destinationApplicationSecurityGroups)
@@ -480,7 +489,7 @@ func flattenNetworkSecurityRules(rules *[]networksecuritygroups.SecurityRule) []
 				sourceApplicationSecurityGroups := make([]string, 0)
 				if props.SourceApplicationSecurityGroups != nil {
 					for _, g := range *props.SourceApplicationSecurityGroups {
-						sourceApplicationSecurityGroups = append(sourceApplicationSecurityGroups, *g.Id)
+						sourceApplicationSecurityGroups = append(sourceApplicationSecurityGroups, strings.ToLower(*g.Id))
 					}
 				}
 				sgRule["source_application_security_group_ids"] = set.FromStringSlice(sourceApplicationSecurityGroups)
@@ -535,4 +544,9 @@ func validateSecurityRule(sgRule map[string]interface{}) error {
 	}
 
 	return err.ErrorOrNil()
+}
+
+// HashCaseInsensitiveStringNSG provides case-insensitive hashing for TypeSet elements in NSG
+func HashCaseInsensitiveStringNSG(v interface{}) int {
+	return pluginsdk.HashString(strings.ToLower(v.(string)))
 }
